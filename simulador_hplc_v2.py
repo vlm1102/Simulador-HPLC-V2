@@ -79,10 +79,14 @@ for i in range(len(picos_ordenados) - 1):
 # Exibindo o gráfico
 st.pyplot(temp_fig)
 
+# Legenda abaixo do gráfico
+handles, labels = temp_ax.get_legend_handles_labels()
+temp_ax.legend(handles=handles, labels=labels, loc="upper center", bbox_to_anchor=(0.5, -0.15), shadow=True, ncol=3)
+
 # Tabela de parâmetros cromatográficos
 st.subheader("📊 Tabela de parâmetros cromatográficos")
 df = pd.DataFrame(resultados, columns=["Composto", "Rt (min)", "Início do pico (min)", "Fim do pico (min)", "Largura da base do pico / width (min)", "Pratos teóricos"])
-df['Composto'] = df['Composto'].replace({"Dipirona": 1, "Cafeína": 2, "Orfenadrina": 3})
+df['Composto'] = df['Composto'].replace({"Dipirona": "Dipirona", "Cafeína": "Cafeína", "Orfenadrina": "Orfenadrina"})
 st.dataframe(df.style.format({"Rt (min)": "{:.2f}", "Início do pico (min)": "{:.2f}", "Fim do pico (min)": "{:.2f}", "Largura da base do pico / width (min)": "{:.2f}"}))
 
 # Tabela de resolução
