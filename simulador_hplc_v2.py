@@ -36,7 +36,7 @@ cores = {'Dipirona': 'blue', 'Cafeína': 'green', 'Orfenadrina': 'red'}
 resultados = []
 
 # Preparar a figura do gráfico
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(10, 6))
 ax.set_xlim(0, 20)
 ax.set_ylim(0, 1.5)
 ax.set_xlabel("Tempo (min)")
@@ -74,7 +74,12 @@ df = pd.DataFrame(resultados, columns=["Nº", "Composto", "Rt (min)", "Início d
 st.dataframe(df.style.format({"Rt (min)": "{:.2f}", "Início do pico (min)": "{:.2f}", "Fim do pico (min)": "{:.2f}", "Largura da base do pico / width (min)": "{:.2f}"}))
 
 # Legenda
-ax.legend()
+ax.legend(loc='upper right')
+
+# Adicionar legenda abaixo do gráfico
+handles, labels = ax.get_legend_handles_labels()
+labels = [f'{label} (Substância)' for label in labels]
+ax.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=3)
 
 # Tabela de resoluções
 resolucoes = []
