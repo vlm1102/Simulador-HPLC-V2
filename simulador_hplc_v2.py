@@ -46,38 +46,54 @@ fig, ax = plt.subplots()
 resolucoes = []
 picos_ordenados = []
 
-for composto, tr in sorted(tempos_ret.items(), key=lambda x: x[1]):
+for i, (composto, tr) in enumerate(sorted(tempos_ret.items(), key=lambda x: x[1]), start=1):
     altura = 1.0
-    largura = 0.25 + (fluxo * 0.1) + (abs(temperatura - 35) * 0.01)
-    largura *= 1 + abs(fase_movel - 50) / 100
-    pico = altura * np.exp(-((tempo - tr) ** 2) / (2 * largura ** 2))
-    sinal_total += pico
-
+    largura = 0.15 + (fluxo * 0.05) + (abs(temperatura - 35) * 0.005)
+    largura *= 1 + abs(fase_movel - 50) / 200
     start = tr - 2 * largura
     end = tr + 2 * largura
-    pratos = 16 * (tr / (end - start)) ** 2
-    resultados.append([composto, tr, largura, start, end, int(pratos)])
-    ax.plot(tempo, pico, label=f'{composto}', color=cores[composto])
-    picos_ordenados.append((composto, tr, largura))
+    width = end - start
+    pratos = 16 * (tr / width) ** 2
+    pico = altura * np.exp(-((tempo - tr) ** 2) / (2 * (width / 4) ** 2))
+    sinal_total += pico
 
-# Cálculo da resolução entre picos consecutivos (segundo Farmacopeia Brasileira)
+    resultados.append([i, composto, tr, start, end, width, int(pratos)])
+    picos_ordenados.append((composto, tr, width))
+
+# Cálculo da resolução entre picos consecutivos (Farmacopeia Brasileira)
 for i in range(len(picos_ordenados) - 1):
     comp1, tr1, w1 = picos_ordenados[i]
     comp2, tr2, w2 = picos_ordenados[i+1]
     Rs = (2 * abs(tr2 - tr1)) / (w1 + w2)
     resolucoes.append([f"{comp1} / {comp2}", Rs])
 
-ax.plot(tempo, sinal_total, 'k--', alpha=0.4, label='Sinal combinado')
-ax.set_xlabel("Tempo (min)")
-ax.set_ylabel("Intensidade")
-ax.set_title("Cromatograma Simulado")
-ax.legend(loc='upper right')
+# Animação do cromatograma
+frame_data = []
+sinal_animado = np.zeros_like(tempo)
+
+for i in range(len(tempo)):
+    sinal_animado[i] = sinal_total[i]
+    frame_data.append(sinal_animado.copy())
+
+def animate(i):
+    ax.clear()
+    ax.plot(tempo[:i], frame_data[i][:i], 'k-')
+    ax.set_xlim(0, 20)
+    ax.set_ylim(0, 1.5)
+    ax.set_xlabel("Tempo (min)")
+    ax.set_ylabel("Intensidade")
+    ax.set_title("Cromatograma Simulado (em tempo real)")
+    ax.grid(True)
+    ax.legend(loc='upper right')
+
+ani = FuncAnimation(fig, animate, frames=len(tempo), interval=10, repeat=False)
+
 st.pyplot(fig)
 
 # Tabela de resultados
 st.subheader("📊 Tabela de parâmetros cromatográficos")
-df = pd.DataFrame(resultados, columns=["Composto", "tR (min)", "Largura", "Início", "Fim", "Pratos teóricos"])
-st.dataframe(df.style.format({"tR (min)": "{:.2f}", "Largura": "{:.2f}", "Início": "{:.2f}", "Fim": "{:.2f}"}))
+df = pd.DataFrame(resultados, columns=["Nº", "Composto", "Rt (min)", "Início do pico (min)", "Fim do pico (min)", "Largura da base do pico / width (min)", "Pratos teóricos"])
+st.dataframe(df.style.format({"Rt (min)": "{:.2f}", "Início do pico (min)": "{:.2f}", "Fim do pico (min)": "{:.2f}", "Largura da base do pico / width (min)": "{:.2f}"}))
 
 # Tabela de resoluções
 if resolucoes:
@@ -105,7 +121,7 @@ def exportar_pdf():
 
     for i in range(len(df)):
         linha = df.iloc[i]
-        texto = f"{linha['Composto']}: tR={linha['tR (min)']:.2f} min, Largura={linha['Largura']:.2f}, Início={linha['Início']:.2f}, Fim={linha['Fim']:.2f}, Pratos={linha['Pratos teóricos']}"
+        texto = f"{linha['Nº']}. {linha['Composto']}: Rt={linha['Rt (min)']:.2f} min, Início={linha['Início do pico (min)']:.2f}, Fim={linha['Fim do pico (min)']:.2f}, Width={linha['Largura da base do pico / width (min)']:.2f}, Pratos={linha['Pratos teóricos']}"
         pdf.cell(200, 10, txt=texto, ln=1)
 
     if resolucoes:
