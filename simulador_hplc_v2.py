@@ -94,32 +94,3 @@ if resolucoes:
     st.subheader("📏 Resolução entre picos")
     df_rs = pd.DataFrame(resolucoes, columns=["Pares de Compostos", "Resolução (Rs)"])
     st.dataframe(df_rs.style.format({"Resolução (Rs)": "{:.2f}"}))
-
-# Exportar como PDF
-st.subheader("📄 Exportar resultados")
-
-def exportar_pdf():
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Relatório do Cromatograma HPLC", ln=1, align='C')
-    pdf.ln(10)
-
-    for i in range(len(df)):
-        linha = df.iloc[i]
-        texto = f"{linha['Composto']}: Rt={linha['Rt (min)']:.2f} min, Início={linha['Início do pico (min)']:.2f}, Fim={linha['Fim do pico (min)']:.2f}, Width={linha['Largura da base do pico / width (min)']:.2f}, Pratos={linha['Pratos teóricos']}"
-        pdf.cell(200, 10, txt=texto, ln=1)
-
-    buf = io.BytesIO()
-    temp_fig.savefig(buf, format='png')
-    buf.seek(0)
-    pdf.image(buf, x=10, y=None, w=180)
-
-    pdf_output = io.BytesIO()
-    pdf.output(pdf_output)
-    b64 = base64.b64encode(pdf_output.getvalue()).decode()
-    href = f'<a href="data:application/pdf;base64,{b64}" download="relatorio_hplc.pdf">📥 Baixar PDF</a>'
-    st.markdown(href, unsafe_allow_html=True)
-
-if st.button("Exportar como PDF"):
-    exportar_pdf()
