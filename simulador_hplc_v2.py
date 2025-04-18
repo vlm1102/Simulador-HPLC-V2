@@ -40,7 +40,13 @@ sinal_total = np.zeros_like(tempo)
 cores = {'Dipirona': 'blue', 'Cafeína': 'green', 'Orfenadrina': 'red'}
 resultados = []
 
-fig, ax = plt.subplots()
+# Preparar figura e eixos
+temp_fig, temp_ax = plt.subplots()
+temp_ax.set_xlim(0, 20)
+temp_ax.set_ylim(0, 1.5)
+temp_ax.set_xlabel("Tempo (min)")
+temp_ax.set_ylabel("Intensidade")
+temp_ax.set_title("Cromatograma Simulado")
 
 # Para cálculo de resolução
 resolucoes = []
@@ -58,6 +64,7 @@ for i, (composto, tr) in enumerate(sorted(tempos_ret.items(), key=lambda x: x[1]
     sinal_total += pico
 
     resultados.append([i, composto, tr, start, end, width, int(pratos)])
+    temp_ax.plot(tempo, pico, label=f'{composto}', color=cores[composto])
     picos_ordenados.append((composto, tr, width))
 
 # Cálculo da resolução entre picos consecutivos (Farmacopeia Brasileira)
@@ -68,27 +75,28 @@ for i in range(len(picos_ordenados) - 1):
     resolucoes.append([f"{comp1} / {comp2}", Rs])
 
 # Animação do cromatograma
-frame_data = []
-sinal_animado = np.zeros_like(tempo)
+fig_anim, ax_anim = plt.subplots()
+ax_anim.set_xlim(0, 20)
+ax_anim.set_ylim(0, 1.5)
+ax_anim.set_xlabel("Tempo (min)")
+ax_anim.set_ylabel("Intensidade")
+ax_anim.set_title("Cromatograma Simulado (em tempo real)")
 
-for i in range(len(tempo)):
-    sinal_animado[i] = sinal_total[i]
-    frame_data.append(sinal_animado.copy())
+linha_animada, = ax_anim.plot([], [], 'k-')
+
+def init():
+    linha_animada.set_data([], [])
+    return linha_animada,
 
 def animate(i):
-    ax.clear()
-    ax.plot(tempo[:i], frame_data[i][:i], 'k-')
-    ax.set_xlim(0, 20)
-    ax.set_ylim(0, 1.5)
-    ax.set_xlabel("Tempo (min)")
-    ax.set_ylabel("Intensidade")
-    ax.set_title("Cromatograma Simulado (em tempo real)")
-    ax.grid(True)
-    ax.legend(loc='upper right')
+    x = tempo[:i]
+    y = sinal_total[:i]
+    linha_animada.set_data(x, y)
+    return linha_animada,
 
-ani = FuncAnimation(fig, animate, frames=len(tempo), interval=10, repeat=False)
+ani = FuncAnimation(fig_anim, animate, init_func=init, frames=len(tempo), interval=1, blit=True, repeat=False)
 
-st.pyplot(fig)
+st.pyplot(fig_anim)
 
 # Tabela de resultados
 st.subheader("📊 Tabela de parâmetros cromatográficos")
@@ -131,7 +139,7 @@ def exportar_pdf():
             pdf.cell(200, 10, txt=f"{par}: Rs = {rs:.2f}", ln=1)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format='png')
+    temp_fig.savefig(buf, format='png')
     buf.seek(0)
     pdf.image(buf, x=10, y=None, w=180)
 
