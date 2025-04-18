@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.animation import FuncAnimation
 import io
 from fpdf import FPDF
 import base64
@@ -26,7 +27,10 @@ def calcular_tempo_ret(composto, base_tr):
 
 # Configuração base
 if modo_quiz:
-    tr_bases = {"Dipirona": 3.0, "Cafeína": 3.4, "Orfenadrina": 6.0}  # Ajustado para possível separação
+    tr_bases = {"Dipirona": 3.5, "Cafeína": 3.7, "Orfenadrina": 6.0}  # Dipirona e Cafeína coeluindo
+    fluxo = 0.5
+    temperatura = 25
+    fase_movel = 10
 else:
     tr_bases = {"Dipirona": 2.0, "Cafeína": 4.0, "Orfenadrina": 6.0}
 
@@ -38,17 +42,20 @@ sinal_total = np.zeros_like(tempo)
 
 cores = {'Dipirona': 'blue', 'Cafeína': 'green', 'Orfenadrina': 'red'}
 resultados = []
+
+# Preparar figura e eixos
+temp_fig, temp_ax = plt.subplots()
+temp_ax.set_xlim(0, 20)
+temp_ax.set_ylim(0, 1.5)
+temp_ax.set_xlabel("Tempo (min)")
+temp_ax.set_ylabel("Intensidade")
+temp_ax.set_title("Cromatograma Simulado")
+
+# Para cálculo de resolução
 resolucoes = []
 picos_ordenados = []
+linha_coeluicao = None  # Variável para a linha de coeluição
 
-fig, ax = plt.subplots()
-ax.set_xlim(0, 20)
-ax.set_ylim(0, 1.5)
-ax.set_xlabel("Tempo (min)")
-ax.set_ylabel("Intensidade")
-ax.set_title("Cromatograma Simulado")
-
-# Gerar os picos gaussianos
 for i, (composto, tr) in enumerate(sorted(tempos_ret.items(), key=lambda x: x[1]), start=1):
     altura = 1.0
     largura = 0.15 + (fluxo * 0.05) + (abs(temperatura - 35) * 0.005)
@@ -60,44 +67,42 @@ for i, (composto, tr) in enumerate(sorted(tempos_ret.items(), key=lambda x: x[1]
     pico = altura * np.exp(-((tempo - tr) ** 2) / (2 * (width / 4) ** 2))
     sinal_total += pico
 
-    resultados.append([i, composto, tr, start, end, width, int(pratos)])
-    estilo_linha = ':' if modo_quiz and composto in ['Dipirona', 'Cafeína'] else '-'
-    ax.plot(tempo, pico, estilo_linha, label=f'{composto}', color=cores[composto])
+    resultados.append([composto, tr, start, end, width, int(pratos)])
+    temp_ax.plot(tempo, pico, label=f'{composto}', color=cores[composto])
     picos_ordenados.append((composto, tr, width))
 
-# Cálculo da resolução entre picos consecutivos (Farmacopeia Brasileira)
+# Verificando coeluição e desenhando a linha cinza de coeluição
 for i in range(len(picos_ordenados) - 1):
     comp1, tr1, w1 = picos_ordenados[i]
     comp2, tr2, w2 = picos_ordenados[i+1]
     Rs = (2 * abs(tr2 - tr1)) / (w1 + w2)
+    if Rs < 2:  # Coeluindo
+        start_coel = min(tr1 - w1, tr2 - w2)
+        end_coel = max(tr1 + w1, tr2 + w2)
+        linha_coeluicao = temp_ax.plot(tempo, sinal_total, 'k--', label='Região de Coeluição')
+
     resolucoes.append([f"{comp1} / {comp2}", Rs])
 
-# Mostrar gráfico
-st.pyplot(fig)
+# Exibindo o gráfico
+st.pyplot(temp_fig)
 
-# Legenda de cores abaixo do gráfico
-with st.container():
-    st.markdown("### 🟦 Legenda do Cromatograma")
-    for comp, cor in cores.items():
-        estilo = "pontilhada" if modo_quiz and comp in ['Dipirona', 'Cafeína'] else "sólida"
-        st.markdown(f"<span style='color:{cor}'>●</span> {comp} - Linha {estilo}", unsafe_allow_html=True)
-
-# Tabela de resultados
+# Tabela de parâmetros cromatográficos
 st.subheader("📊 Tabela de parâmetros cromatográficos")
-df = pd.DataFrame(resultados, columns=["Nº", "Composto", "Rt (min)", "Início do pico (min)", "Fim do pico (min)", "Largura da base do pico / width (min)", "Pratos teóricos"])
+df = pd.DataFrame(resultados, columns=["Composto", "Rt (min)", "Início do pico (min)", "Fim do pico (min)", "Largura da base do pico / width (min)", "Pratos teóricos"])
+df['Composto'] = df['Composto'].replace({"Dipirona": 1, "Cafeína": 2, "Orfenadrina": 3})
 st.dataframe(df.style.format({"Rt (min)": "{:.2f}", "Início do pico (min)": "{:.2f}", "Fim do pico (min)": "{:.2f}", "Largura da base do pico / width (min)": "{:.2f}"}))
 
-# Tabela de resoluções
+# Tabela de resolução
 if resolucoes:
     st.subheader("📏 Resolução entre picos")
     df_rs = pd.DataFrame(resolucoes, columns=["Pares de Compostos", "Resolução (Rs)"])
     st.dataframe(df_rs.style.format({"Resolução (Rs)": "{:.2f}"}))
 
-# Modo Quiz - Feedback
+# Feedback no modo quiz
 if modo_quiz:
-    rs_valores = [rs for _, rs in resolucoes]
-    if all(rs > 2.0 for rs in rs_valores):
-        st.success("✅ Boa! Você conseguiu separar os picos coeluídos.")
+    resolvidos = all(rs > 2 for _, rs in resolucoes)
+    if resolvidos:
+        st.success("✅ Boa! Você conseguiu separar os picos.")
     else:
         st.warning("❌ Os compostos ainda estão coeluindo. Tente ajustar os parâmetros.")
 
@@ -113,17 +118,11 @@ def exportar_pdf():
 
     for i in range(len(df)):
         linha = df.iloc[i]
-        texto = f"{linha['Nº']}. {linha['Composto']}: Rt={linha['Rt (min)']:.2f} min, Início={linha['Início do pico (min)']:.2f}, Fim={linha['Fim do pico (min)']:.2f}, Width={linha['Largura da base do pico / width (min)']:.2f}, Pratos={linha['Pratos teóricos']}"
+        texto = f"{linha['Composto']}: Rt={linha['Rt (min)']:.2f} min, Início={linha['Início do pico (min)']:.2f}, Fim={linha['Fim do pico (min)']:.2f}, Width={linha['Largura da base do pico / width (min)']:.2f}, Pratos={linha['Pratos teóricos']}"
         pdf.cell(200, 10, txt=texto, ln=1)
 
-    if resolucoes:
-        pdf.ln(5)
-        pdf.cell(200, 10, txt="Resoluções entre picos:", ln=1)
-        for par, rs in resolucoes:
-            pdf.cell(200, 10, txt=f"{par}: Rs = {rs:.2f}", ln=1)
-
     buf = io.BytesIO()
-    fig.savefig(buf, format='png')
+    temp_fig.savefig(buf, format='png')
     buf.seek(0)
     pdf.image(buf, x=10, y=None, w=180)
 
@@ -135,3 +134,4 @@ def exportar_pdf():
 
 if st.button("Exportar como PDF"):
     exportar_pdf()
+
