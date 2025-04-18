@@ -26,7 +26,7 @@ def calcular_tempo_ret(composto, base_tr):
 
 # Configuração base
 if modo_quiz:
-    tr_bases = {"Dipirona": 3.5, "Cafeína": 3.7, "Orfenadrina": 6.0}  # Dipirona e Cafeína coeluindo
+    tr_bases = {"Dipirona": 3.0, "Cafeína": 3.4, "Orfenadrina": 6.0}  # Ajustado para possível separação
 else:
     tr_bases = {"Dipirona": 2.0, "Cafeína": 4.0, "Orfenadrina": 6.0}
 
@@ -38,8 +38,9 @@ sinal_total = np.zeros_like(tempo)
 
 cores = {'Dipirona': 'blue', 'Cafeína': 'green', 'Orfenadrina': 'red'}
 resultados = []
+resolucoes = []
+picos_ordenados = []
 
-# Preparar figura e eixos
 fig, ax = plt.subplots()
 ax.set_xlim(0, 20)
 ax.set_ylim(0, 1.5)
@@ -47,10 +48,7 @@ ax.set_xlabel("Tempo (min)")
 ax.set_ylabel("Intensidade")
 ax.set_title("Cromatograma Simulado")
 
-# Para cálculo de resolução
-resolucoes = []
-picos_ordenados = []
-
+# Gerar os picos gaussianos
 for i, (composto, tr) in enumerate(sorted(tempos_ret.items(), key=lambda x: x[1]), start=1):
     altura = 1.0
     largura = 0.15 + (fluxo * 0.05) + (abs(temperatura - 35) * 0.005)
@@ -63,7 +61,8 @@ for i, (composto, tr) in enumerate(sorted(tempos_ret.items(), key=lambda x: x[1]
     sinal_total += pico
 
     resultados.append([i, composto, tr, start, end, width, int(pratos)])
-    ax.plot(tempo, pico, label=f'{composto}', color=cores[composto])
+    estilo_linha = ':' if modo_quiz and composto in ['Dipirona', 'Cafeína'] else '-'
+    ax.plot(tempo, pico, estilo_linha, label=f'{composto}', color=cores[composto])
     picos_ordenados.append((composto, tr, width))
 
 # Cálculo da resolução entre picos consecutivos (Farmacopeia Brasileira)
@@ -73,7 +72,15 @@ for i in range(len(picos_ordenados) - 1):
     Rs = (2 * abs(tr2 - tr1)) / (w1 + w2)
     resolucoes.append([f"{comp1} / {comp2}", Rs])
 
+# Mostrar gráfico
 st.pyplot(fig)
+
+# Legenda de cores abaixo do gráfico
+with st.container():
+    st.markdown("### 🟦 Legenda do Cromatograma")
+    for comp, cor in cores.items():
+        estilo = "pontilhada" if modo_quiz and comp in ['Dipirona', 'Cafeína'] else "sólida"
+        st.markdown(f"<span style='color:{cor}'>●</span> {comp} - Linha {estilo}", unsafe_allow_html=True)
 
 # Tabela de resultados
 st.subheader("📊 Tabela de parâmetros cromatográficos")
@@ -88,8 +95,8 @@ if resolucoes:
 
 # Modo Quiz - Feedback
 if modo_quiz:
-    rs_suficiente = all(rs[1] > 2 for rs in resolucoes)
-    if rs_suficiente:
+    rs_valores = [rs for _, rs in resolucoes]
+    if all(rs > 2.0 for rs in rs_valores):
         st.success("✅ Boa! Você conseguiu separar os picos coeluídos.")
     else:
         st.warning("❌ Os compostos ainda estão coeluindo. Tente ajustar os parâmetros.")
